@@ -49,7 +49,7 @@ int main(int argc, char *argv[])
 	while(true)
 	{
 		initialMessage = (char*) calloc(1,sizeof(char));
-		cout << "Type you message to send to the server" << endl;
+		cout << "Type you message to send to the server. Type q to end connection to the server" << endl;
 		getMessage(initialMessage);
 
 		char message[strlen(initialMessage)], serverReply[strlen(initialMessage)];
@@ -58,31 +58,34 @@ int main(int argc, char *argv[])
 		// copying the contents of the
 		// string to char array
 		strcpy(message, initialMessage);
-
-		int size = strlen(message);
-		//first send across the size of the message
-		if(send(socketFd,&size, sizeof(size), 0) < 0)
+		if(message[0] == 'q' && strlen(message) == 1)
 		{
-			cerr << "Could not send size of message";
-			return 0;
-		}
-		if(send(socketFd, message, size,0) < 0)
-		{
-			cerr << "Could not send message";
-			return 0;
-		}
-
-		//Receive the hashed message back from the server
-		if(recv(socketFd, serverReply, 20, 0) > 0) //this is 20 as a SHA-1 algorithm produces a 20 byte long array
-		{
-			char hashstr[41];
-			convertSHA1BinaryToCharStr((unsigned char *)serverReply, hashstr);
-			cout << "Hashed reply from server: "<< hashstr <<endl;
+			cout << "Close client" << endl;
 			close(socketFd);
-			return 1;
+			return 0;
+		}else
+		{
+			int size = strlen(message);
+			//first send across the size of the message
+			if(send(socketFd,&size, sizeof(size), 0) < 0)
+			{
+				cerr << "Could not send size of message";
+				return 0;
+			}
+			if(send(socketFd, message, size,0) < 0)
+			{
+				cerr << "Could not send message";
+				return 0;
+			}
+
+			//Receive the hashed message back from the server
+			if(recv(socketFd, serverReply, 20, 0) > 0) //this is 20 as a SHA-1 algorithm produces a 20 byte long array
+			{
+				char hashstr[41];
+				convertSHA1BinaryToCharStr((unsigned char *)serverReply, hashstr);
+				cout << "Hashed reply from server: "<< hashstr <<endl;
+			}
 		}
-
-
 	}
 	close(socketFd);
 	return 1;

@@ -123,7 +123,7 @@ void *clientHandler(void *dummyPT)
 	    	SHA1(hash, messageSize, hash);
 	    }
 		send(clientFd, hash, 20,0);
-		cout << clientMessage << endl;
+		fflush(stdout);
 
 	}
 
