@@ -1,4 +1,5 @@
 #include <iostream>
+#include <iomanip>
 #include <sys/socket.h>
 #include <unistd.h>
 #include <cstring>
@@ -7,6 +8,7 @@
 using namespace std;
 
 void getMessage(char* message);
+void convertSHA1BinaryToCharStr(const unsigned char * const hashbin, char * const hashstr);
 
 int main(int argc, char *argv[])
 {
@@ -47,42 +49,39 @@ int main(int argc, char *argv[])
 	while(true)
 	{
 		initialMessage = (char*) calloc(1,sizeof(char));
-		cout << "Type you message to send to the server. To end the session type 'q'" << endl;
+		cout << "Type you message to send to the server" << endl;
 		getMessage(initialMessage);
 
-		char message[(strlen(initialMessage)) + 1], serverReply[(strlen(initialMessage)) + 1];
+		char message[strlen(initialMessage)], serverReply[strlen(initialMessage)];
 
 
 		// copying the contents of the
 		// string to char array
 		strcpy(message, initialMessage);
 
-		if(message[0] == 'q' && strlen(message) == 1)
-			{
-				cout << "Close client" << endl;
-				close(socketFd);
-				return 0;
-			}else
-			{
-				int size = strlen(message);
-				//first send across the size of the messsage
-				if(send(socketFd,&size, sizeof(size), 0) < 0)
-				{
-					cerr << "Could not send size of message";
-					return 0;
-				}
-				if(send(socketFd, (char*) message, strlen(message),0) < 0)
-				{
-					cerr << "Could not send message";
-					return 0;
-				}
+		int size = strlen(message);
+		//first send across the size of the message
+		if(send(socketFd,&size, sizeof(size), 0) < 0)
+		{
+			cerr << "Could not send size of message";
+			return 0;
+		}
+		if(send(socketFd, message, size,0) < 0)
+		{
+			cerr << "Could not send message";
+			return 0;
+		}
 
-				//Receive the hashed message back from the server
-				if(recv(socketFd, serverReply, strlen(message), 0) > 0)
-				{
-					cout<< "Server Reply: " << serverReply << endl;
-				}
-			}
+		//Receive the hashed message back from the server
+		if(recv(socketFd, serverReply, 20, 0) > 0) //this is 20 as a SHA-1 algorithm produces a 20 byte long array
+		{
+			char hashstr[41];
+			convertSHA1BinaryToCharStr((unsigned char *)serverReply, hashstr);
+			cout << "Hashed reply from server: "<< hashstr <<endl;
+			close(socketFd);
+			return 1;
+		}
+
 
 	}
 	close(socketFd);
@@ -101,5 +100,13 @@ void getMessage(char* message)
 	   message= (char*) realloc(message,leng+1);
 	   *(message+leng) = nextChar;
 	   *(message+leng+1) = '\0';
+	}
+}
+
+void convertSHA1BinaryToCharStr(const unsigned char * const hashbin, char * const hashstr)
+{
+	for(int i = 0; i<20; ++i)
+	{
+		sprintf(&hashstr[i*2], "%02X", hashbin[i]);
 	}
 }

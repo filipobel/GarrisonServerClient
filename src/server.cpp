@@ -6,6 +6,7 @@
 #include <pthread.h>
 #include <unistd.h>
 #include <arpa/inet.h>
+#include <openssl/sha.h>
 
 using namespace std;
 
@@ -16,9 +17,10 @@ static int clientFd;
 int main(int argc, char* argv[])
 {
 	int portNumber, socketFd, length;
-	int *newSocket;
 	int opt = 1;
 	struct sockaddr_in socketAddress, clientAddress;
+
+	pthread_t masterThread[20];
 	//first check that the only command line argument is a port number
 	//and that the port number is valid
 	if(argc < 2)
@@ -47,7 +49,6 @@ int main(int argc, char* argv[])
 		return 0;
 	}
 
-	//bzero((char*) &socketAddress, sizeof(socketAddress));
 
 	//bind socket to given port
 	socketAddress.sin_family = AF_INET;
@@ -71,40 +72,59 @@ int main(int argc, char* argv[])
 		length = sizeof(struct sockaddr_in);
 	}
 
+	int numberThreads = 0;
 	//When a client sends a connection requestion to the server, accept it and
 	//send it to an individual thread to be dealt with
-	while((clientFd = accept(socketFd, (struct sockaddr *)&clientAddress, (socklen_t*)&length)))
+	while(numberThreads < 20)
 	{
+		clientFd = accept(socketFd, (struct sockaddr *)&clientAddress, (socklen_t*)&length);
+		if(clientFd < 0)
+		{
+			cerr << "Connections was not accepted";
+			return 0;
+		}
 		cout << "Connection Accepted" << endl;
 
-		pthread_t masterThread;
-		newSocket = (int*) malloc(sizeof *newSocket);
-		*newSocket = clientFd;
-		if(pthread_create(&masterThread, NULL, clientHandler, NULL) < 0)
+
+		if(pthread_create(&masterThread[numberThreads], NULL, clientHandler, NULL) < 0)
 		{
 			cerr << "Could not create a thread for a client" << endl;
 			return 0;
 		}
+
+		numberThreads++;
+	}
+	for(int i = 0; i<20; i++)
+	{
+		pthread_join(masterThread[i],NULL);
 	}
 }
 
 void *clientHandler(void *dummyPT)
 {
-	cout << "in client handler" << endl;
 //	//first get the socket descriptor
 	int readSize, messageSize;
-	char clientMessage[2000];
 
 	//first receive the size of the message
 	if(recv(clientFd, &messageSize, sizeof(messageSize),0) < 0)
 	{
 		cerr << "Could not receive number from server" << endl;
 	}
+	char clientMessage[messageSize];
 	while((readSize = recv(clientFd,clientMessage, messageSize, 0)) > 0)
 	{
 		//Hash the message received from the user and send it back to them
-		write(clientFd, clientMessage, strlen(clientMessage));
+	    unsigned char hash[20];
+
+	    // compute the sha1 of the input, and store it our  hash array
+	    SHA1((unsigned char*)clientMessage, messageSize, hash);
+	    for(int i= 0; i<1000; i++)
+	    {
+	    	SHA1(hash, messageSize, hash);
+	    }
+		send(clientFd, hash, 20,0);
 		cout << clientMessage << endl;
+
 	}
 
 	if(readSize == 0)
@@ -112,4 +132,6 @@ void *clientHandler(void *dummyPT)
 		cout << "Client Disconnected";
 		fflush(stdout);
 	}
+
+	close(clientFd);
 }
